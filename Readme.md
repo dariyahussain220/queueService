@@ -4,7 +4,7 @@ This application connects to SQS and listens the Queue continuosly.
 
 Note :
 
-use application.properties for the aws credentials.
+change the aws credentials in  application.properties file
 
 exposed with swagger api explorer for testing purpose.
 
@@ -14,14 +14,14 @@ For further reference, please consider the following sections:
 
 Build :
 
-> gradlew clean build
+##> gradlew clean build
 
 
 Running :
 
 inside build folder
 
-> java -jar <jarName> 
+##> java -jar #<jarName># 
 
 once jar runs successfully you can check  http://localhost:8090/swagger-ui.html#
 
