@@ -15,6 +15,10 @@ import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 import com.amazonaws.services.sqs.model.CreateQueueRequest;
 import com.amazonaws.services.sqs.model.CreateQueueResult;
+import com.amazonaws.services.sqs.model.GetQueueAttributesRequest;
+import com.amazonaws.services.sqs.model.GetQueueAttributesResult;
+import com.amazonaws.services.sqs.model.QueueAttributeName;
+import com.amazonaws.services.sqs.model.SetQueueAttributesRequest;
 import com.poc.sqs.utils.QueueTypes;
 import com.poc.sqs.utils.RequestDTO;
 
@@ -35,6 +39,8 @@ public class QueueService {
 
 	public String createQueue(RequestDTO dto) {
 		String queueUrl = null;
+		String deadLetterQueueUrl = null;
+
 		try {
 			final AmazonSQS sqs = this.awsCredentialsProvider(dto.getAccessKey(), dto.getSecretKey());
 			if (dto.getQueueType().equalsIgnoreCase(QueueTypes.STANDARD.name()) || dto.getQueueType() == null) {
@@ -55,9 +61,24 @@ public class QueueService {
 				 * MessageDeduplicationId based on the content.
 				 */
 				attributes.put("ContentBasedDeduplication", "true");
+
 				final CreateQueueRequest createFIFOQueueRequest = new CreateQueueRequest(dto.getQueueName() + ".fifo")
 						.withAttributes(attributes);
 				queueUrl = sqs.createQueue(createFIFOQueueRequest).getQueueUrl();
+
+				final CreateQueueRequest createDeadFIFOQueueRequest = new CreateQueueRequest(
+						"DeadLetter" + dto.getQueueName() + ".fifo").withAttributes(attributes);
+				deadLetterQueueUrl = sqs.createQueue(createDeadFIFOQueueRequest).getQueueUrl();
+
+				final GetQueueAttributesResult deadLetterQueueAttributes = sqs.getQueueAttributes(
+						new GetQueueAttributesRequest(deadLetterQueueUrl).withAttributeNames("QueueArn"));
+				final String deadLetterQueueArn = deadLetterQueueAttributes.getAttributes().get("QueueArn");
+
+				// Set the dead-letter queue for the source queue using the redrive policy.
+				final SetQueueAttributesRequest request = new SetQueueAttributesRequest().withQueueUrl(queueUrl)
+						.addAttributesEntry(QueueAttributeName.RedrivePolicy.toString(),
+								"{\"maxReceiveCount\":\"5\", \"deadLetterTargetArn\":\"" + deadLetterQueueArn + "\"}");
+				sqs.setQueueAttributes(request);
 			}
 
 		} catch (AmazonClientException e) {
